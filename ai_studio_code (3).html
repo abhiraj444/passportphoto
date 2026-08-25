@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passport Photo Sheet Generator with Custom Cropping</title>
+    <!-- jsPDF library for generating high-quality PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Cropper.js for professional crop handling -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+        }
+
+        header {
+            grid-column: 1 / -1;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin: 0 0 8px 0;
+            color: #111827;
+        }
+
+        p.subtitle {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+
+        select, input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+            background-color: #fff;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .inline-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e5e7eb;
+        }
+
+        /* Modal styling for Cropper */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .modal-content h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #111827;
+        }
+
+        .cropper-container-wrapper {
+            max-height: 50vh;
+            width: 100%;
+            background: #f3f4f6;
+            overflow: hidden;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .cropper-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .cropper-controls .btn {
+            flex: 1;
+            font-size: 0.85rem;
+            padding: 8px 12px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* Preview Area */
+        .preview-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 500px;
+        }
+
+        .preview-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+            align-self: flex-start;
+        }
+
+        .preview-canvas-container {
+            background: #e5e7eb;
+            border: 2px dashed #9ca3af;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        #preview-page {
+            background: white;
+            position: relative;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .preview-photo {
+            position: absolute;
+            box-sizing: border-box;
+            border: 1px solid #000000;
+            background-color: #f3f4f6;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .preview-photo.placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #9ca3af;
+            border: 1px dashed #9ca3af;
+        }
+
+        .warning {
+            background-color: #fffbeb;
+            border: 1px solid #fef3c7;
+            color: #b45309;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .instructions-card {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-top: 16px;
+        }
+
+        .instructions-card h4 {
+            margin: 0 0 6px 0;
+            font-weight: 600;
+        }
+
+        .instructions-card ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        #custom-size-fields, #custom-paper-fields {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Passport Photo Grid & PDF Generator</h1>
+        <p class="subtitle">Upload and crop an image, configure custom paper dimensions, auto-fill your sheet, and generate a printable PDF.</p>
+    </header>
+
+    <!-- Settings Sidebar -->
+    <div class="panel">
+        <div class="control-group">
+            <label for="image-upload">1. Upload Photo</label>
+            <div style="display: flex; gap: 8px; align-items: stretch;">
+                <input type="file" id="image-upload" accept="image/*" style="flex-grow: 1;">
+                <button type="button" id="recrop-btn" class="btn btn-secondary" style="width: auto; margin-bottom: 0; white-space: nowrap; display: none;">Crop</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="page-size">2. Paper Size</label>
+            <select id="page-size">
+                <option value="a4">A4 (210 x 297 mm)</option>
+                <option value="letter">Letter (215.9 x 279.4 mm)</option>
+                <option value="4x6">4 x 6 inches (101.6 x 152.4 mm)</option>
+                <option value="5x7">5 x 7 inches (127 x 177.8 mm)</option>
+                <option value="custom">Custom Paper Size</option>
+            </select>
+        </div>
+
+        <div id="custom-paper-fields" class="control-group">
+            <div class="inline-inputs">
+                <div>
+                    <label for="custom-paper-width">Paper Width (mm)</label>
+                    <input type="number" id="custom-paper-width" value="210" min="50">
+                </div>
+                <div>
+                    <label for="custom-paper-height">Paper Height (mm)</label>
+                    <input type="number" id="custom-paper-height" value="297" min="50">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="orientation">Page Orientation</label>
+            <select id="orientation">
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="photo-size">3. Photo Dimension</label>
+            <select id="photo-size">
+                <option value="35x45">Standard (35 x 45 mm)</option>
+                <option value="51x51">US / India Passport (2 x 2 in / 51 x 51 mm)</option>
+                <option value="custom">Custom Dimensions</option>
+            </select>
+        </div>
+
+        <div id="custom-size-fields" class="control-group">
+            <div class="inline-inputs">
+                <div>
+                    <label for="custom-width">Width (mm)</label>
+                    <input type="number" id="custom-width" value="35" min="10">
+                </div>
+                <div>
+                    <label for="custom-height">Height (mm)</label>
+                    <input type="number" id="custom-height" value="45" min="10">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="margin">Page Margin (mm)</label>
+            <input type="number" id="margin" value="5" min="0" step="0.5">
+            <span style="font-size: 0.75rem; color: #6b7280;">Distance from the top-left corner of the page.</span>
+        </div>
+
+        <div class="control-group">
+            <label>4. Grid Layout</label>
+            <div class="inline-inputs" style="margin-bottom: 8px;">
+                <div>
+                    <label for="cols" style="font-weight: normal; color: #6b7280; font-size: 0.8rem;">Columns</label>
+                    <input type="number" id="cols" value="4" min="1">
+                </div>
+                <div>
+                    <label for="rows" style="font-weight: normal; color: #6b7280; font-size: 0.8rem;">Rows</label>
+                    <input type="number" id="rows" value="4" min="1">
+                </div>
+            </div>
+            <button type="button" id="autofit-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px;">
+                Auto-Fit Grid to Page
+            </button>
+        </div>
+
+        <div class="control-group">
+            <label for="gap">Gap between Photos (mm)</label>
+            <input type="number" id="gap" value="3" min="0" step="0.5">
+        </div>
+
+        <div id="overflow-warning" class="warning">
+            Note: The configured photo layout exceeds the physical dimensions of the selected page.
+        </div>
+
+        <button id="generate-btn" class="btn" disabled>Generate Printable PDF</button>
+
+        <div class="instructions-card">
+            <h4>Important Printing Tip:</h4>
+            <ul>
+                <li>When printing the generated PDF, set the <strong>Scale</strong> option to <strong>"Actual Size"</strong> (or 100% scale).</li>
+                <li>Do <strong>NOT</strong> select "Fit to Page" or "Shrink to Fit", as printer software will scale down the layout and alter the exact physical measurements of your passport photos.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Live Preview Canvas -->
+    <div class="panel preview-wrapper">
+        <div class="preview-title">Live Layout Preview (Scaled to Fit Screen)</div>
+        <div class="preview-canvas-container">
+            <div id="preview-page"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Cropping Modal Interface -->
+<div id="cropper-modal" class="modal">
+    <div class="modal-content">
+        <h3>Crop Your Photo</h3>
+        <div class="cropper-container-wrapper">
+            <img id="cropper-image" src="" alt="Source image for cropping">
+        </div>
+        <div class="cropper-controls">
+            <button type="button" id="crop-ratio-locked" class="btn btn-secondary">Passport Ratio (Locked)</button>
+            <button type="button" id="crop-ratio-free" class="btn btn-secondary">Free Form</button>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="crop-cancel" class="btn btn-secondary" style="width: auto; margin-bottom: 0;">Cancel</button>
+            <button type="button" id="crop-apply" class="btn" style="width: auto; margin-bottom: 0;">Apply Crop</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let originalImageSrc = null; // Uncropped source data
+    let croppedImageSrc = null;  // Final cropped output
+    let cropperInstance = null;  // CropperJS reference
+
+    // Standard paper dimensions in mm
+    const PAGE_DIMENSIONS = {
+        'a4': { width: 210, height: 297 },
+        'letter': { width: 215.9, height: 279.4 },
+        '4x6': { width: 101.6, height: 152.4 },
+        '5x7': { width: 127, height: 177.8 }
+    };
+
+    // Main UI Event Listeners
+    document.getElementById('image-upload').addEventListener('change', handleImageUpload);
+    document.getElementById('recrop-btn').addEventListener('click', () => {
+        if (originalImageSrc) openCropper(originalImageSrc);
+    });
+    document.getElementById('page-size').addEventListener('change', function() {
+        const customPaperFields = document.getElementById('custom-paper-fields');
+        customPaperFields.style.display = this.value === 'custom' ? 'block' : 'none';
+        updateLayout();
+    });
+    document.getElementById('custom-paper-width').addEventListener('input', updateLayout);
+    document.getElementById('custom-paper-height').addEventListener('input', updateLayout);
+    document.getElementById('orientation').addEventListener('change', updateLayout);
+    document.getElementById('photo-size').addEventListener('change', function() {
+        const customFields = document.getElementById('custom-size-fields');
+        customFields.style.display = this.value === 'custom' ? 'block' : 'none';
+        updateLayout();
+    });
+    document.getElementById('custom-width').addEventListener('input', updateLayout);
+    document.getElementById('custom-height').addEventListener('input', updateLayout);
+    document.getElementById('cols').addEventListener('input', updateLayout);
+    document.getElementById('rows').addEventListener('input', updateLayout);
+    document.getElementById('gap').addEventListener('input', updateLayout);
+    document.getElementById('margin').addEventListener('input', updateLayout);
+    document.getElementById('autofit-btn').addEventListener('click', autoFitGrid);
+    document.getElementById('generate-btn').addEventListener('click', generatePDF);
+
+    // Cropper Modal Event Listeners
+    document.getElementById('crop-ratio-locked').addEventListener('click', () => {
+        const { photoWidth, photoHeight } = getParams();
+        if (cropperInstance) cropperInstance.setAspectRatio(photoWidth / photoHeight);
+    });
+    document.getElementById('crop-ratio-free').addEventListener('click', () => {
+        if (cropperInstance) cropperInstance.setAspectRatio(NaN);
+    });
+    document.getElementById('crop-cancel').addEventListener('click', () => {
+        document.getElementById('cropper-modal').style.display = 'none';
+        if (cropperInstance) {
+            cropperInstance.destroy();
+            cropperInstance = null;
+        }
+        document.getElementById('image-upload').value = '';
+    });
+    document.getElementById('crop-apply').addEventListener('click', () => {
+        if (!cropperInstance) return;
+        const canvas = cropperInstance.getCroppedCanvas();
+        croppedImageSrc = canvas.toDataURL('image/jpeg', 0.95);
+
+        // Close modal and tear down cropper
+        document.getElementById('cropper-modal').style.display = 'none';
+        cropperInstance.destroy();
+        cropperInstance = null;
+
+        document.getElementById('generate-btn').disabled = false;
+        document.getElementById('recrop-btn').style.display = 'block';
+        updateLayout();
+    });
+
+    function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            originalImageSrc = event.target.result;
+            openCropper(originalImageSrc);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function openCropper(src) {
+        const cropperImage = document.getElementById('cropper-image');
+        cropperImage.src = src;
+
+        document.getElementById('cropper-modal').style.display = 'flex';
+
+        if (cropperInstance) {
+            cropperInstance.destroy();
+        }
+
+        const { photoWidth, photoHeight } = getParams();
+        cropperInstance = new Cropper(cropperImage, {
+            aspectRatio: photoWidth / photoHeight, // Start locked to current settings
+            viewMode: 1,
+            autoCropArea: 0.9,
+            responsive: true,
+            restore: false
+        });
+    }
+
+    // Extract current layout settings
+    function getParams() {
+        const pageSizeKey = document.getElementById('page-size').value;
+        const orientation = document.getElementById('orientation').value;
+        const cols = parseInt(document.getElementById('cols').value) || 1;
+        const rows = parseInt(document.getElementById('rows').value) || 1;
+        const gap = parseFloat(document.getElementById('gap').value) || 0;
+        const margin = parseFloat(document.getElementById('margin').value) || 0;
+        const photoSizeVal = document.getElementById('photo-size').value;
+
+        let photoWidth = 35;
+        let photoHeight = 45;
+
+        if (photoSizeVal === '35x45') {
+            photoWidth = 35;
+            photoHeight = 45;
+        } else if (photoSizeVal === '51x51') {
+            photoWidth = 50.8;
+            photoHeight = 50.8;
+        } else if (photoSizeVal === 'custom') {
+            photoWidth = parseFloat(document.getElementById('custom-width').value) || 35;
+            photoHeight = parseFloat(document.getElementById('custom-height').value) || 45;
+        }
+
+        let pageWidth, pageHeight;
+        if (pageSizeKey === 'custom') {
+            pageWidth = parseFloat(document.getElementById('custom-paper-width').value) || 210;
+            pageHeight = parseFloat(document.getElementById('custom-paper-height').value) || 297;
+        } else {
+            let baseDim = PAGE_DIMENSIONS[pageSizeKey];
+            pageWidth = baseDim.width;
+            pageHeight = baseDim.height;
+        }
+
+        if (orientation === 'landscape') {
+            const temp = pageWidth;
+            pageWidth = pageHeight;
+            pageHeight = temp;
+        }
+
+        return { pageWidth, pageHeight, photoWidth, photoHeight, cols, rows, gap, margin, orientation };
+    }
+
+    function autoFitGrid() {
+        const { pageWidth, pageHeight, photoWidth, photoHeight, gap, margin } = getParams();
+
+        const availableWidth = pageWidth - (2 * margin);
+        const availableHeight = pageHeight - (2 * margin);
+
+        const cols = Math.floor((availableWidth + gap) / (photoWidth + gap));
+        const rows = Math.floor((availableHeight + gap) / (photoHeight + gap));
+
+        document.getElementById('cols').value = Math.max(1, cols);
+        document.getElementById('rows').value = Math.max(1, rows);
+
+        updateLayout();
+    }
+
+    // Safely crops the finalized image to match the precise destination container aspect ratio (used as a fallback for free-crop matches)
+    function cropImageToCanvas(img, targetWidth, targetHeight, callback) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const scaleFactor = 300 / 25.4; // 300 DPI
+        canvas.width = targetWidth * scaleFactor;
+        canvas.height = targetHeight * scaleFactor;
+
+        const targetRatio = targetWidth / targetHeight;
+        const imgRatio = img.width / img.height;
+
+        let sx, sy, sWidth, sHeight;
+
+        if (Math.abs(imgRatio - targetRatio) < 0.01) {
+            sx = 0;
+            sy = 0;
+            sWidth = img.width;
+            sHeight = img.height;
+        } else if (imgRatio > targetRatio) {
+            sHeight = img.height;
+            sWidth = img.height * targetRatio;
+            sx = (img.width - sWidth) / 2;
+            sy = 0;
+        } else {
+            sWidth = img.width;
+            sHeight = img.width / targetRatio;
+            sx = 0;
+            sy = (img.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+        callback(canvas.toDataURL('image/jpeg', 0.95));
+    }
+
+    function updateLayout() {
+        const { pageWidth, pageHeight, photoWidth, photoHeight, cols, rows, gap, margin } = getParams();
+        const previewPage = document.getElementById('preview-page');
+        previewPage.innerHTML = '';
+
+        const maxPreviewWidth = 350; 
+        const scale = maxPreviewWidth / pageWidth; 
+        previewPage.style.width = `${maxPreviewWidth}px`;
+        previewPage.style.height = `${pageHeight * scale}px`;
+
+        const startX = margin;
+        const startY = margin;
+
+        const gridWidth = (cols * photoWidth) + ((cols - 1) * gap);
+        const gridHeight = (rows * photoHeight) + ((rows - 1) * gap);
+
+        const warning = document.getElementById('overflow-warning');
+        if ((startX + gridWidth) > pageWidth || (startY + gridHeight) > pageHeight) {
+            warning.style.display = 'block';
+        } else {
+            warning.style.display = 'none';
+        }
+
+        if (!croppedImageSrc) {
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const x = startX + c * (photoWidth + gap);
+                    const y = startY + r * (photoHeight + gap);
+
+                    const div = document.createElement('div');
+                    div.className = 'preview-photo placeholder';
+                    div.style.left = `${x * scale}px`;
+                    div.style.top = `${y * scale}px`;
+                    div.style.width = `${photoWidth * scale}px`;
+                    div.style.height = `${photoHeight * scale}px`;
+                    div.innerText = 'Upload';
+                    previewPage.appendChild(div);
+                }
+            }
+        } else {
+            const img = new Image();
+            img.src = croppedImageSrc;
+            img.onload = function() {
+                cropImageToCanvas(img, photoWidth, photoHeight, function(finalSrc) {
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            const x = startX + c * (photoWidth + gap);
+                            const y = startY + r * (photoHeight + gap);
+
+                            const photoImg = document.createElement('div');
+                            photoImg.className = 'preview-photo';
+                            photoImg.style.backgroundImage = `url(${finalSrc})`;
+                            photoImg.style.left = `${x * scale}px`;
+                            photoImg.style.top = `${y * scale}px`;
+                            photoImg.style.width = `${photoWidth * scale}px`;
+                            photoImg.style.height = `${photoHeight * scale}px`;
+                            previewPage.appendChild(photoImg);
+                        }
+                    }
+                });
+            };
+        }
+    }
+
+    function generatePDF() {
+        if (!croppedImageSrc) return;
+
+        const { jsPDF } = window.jspdf;
+        const { pageWidth, pageHeight, photoWidth, photoHeight, cols, rows, gap, margin, orientation } = getParams();
+
+        const doc = new jsPDF({
+            orientation: orientation,
+            unit: 'mm',
+            format: [pageWidth, pageHeight]
+        });
+
+        const img = new Image();
+        img.src = croppedImageSrc;
+        img.onload = function() {
+            cropImageToCanvas(img, photoWidth, photoHeight, function(finalSrc) {
+                const startX = margin;
+                const startY = margin;
+
+                doc.setDrawColor(0, 0, 0); 
+                doc.setLineWidth(0.15);    
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const x = startX + c * (photoWidth + gap);
+                        const y = startY + r * (photoHeight + gap);
+                        
+                        doc.addImage(finalSrc, 'JPEG', x, y, photoWidth, photoHeight);
+                        doc.rect(x, y, photoWidth, photoHeight, 'S');
+                    }
+                }
+                doc.save('passport-photos-custom-sheet.pdf');
+            });
+        };
+    }
+
+    updateLayout();
+</script>
+</body>
+</html>
